@@ -191,7 +191,7 @@ function portableInputIssues(payload, artifacts) {
   const performance = parseArtifact('world-parity-performance');
   const g5 = parseArtifact('world-parity-native-g5');
   fail(issues, local?.kind === 'world-parity-portable-report'
-    && local.gitSha === '7aaa19d68ef37f64652a878badff484aa04e4c66', 'portable-local-build');
+    && local.gitSha === 'c8d6513b37ab15e9904faf5d85c2d5117deb0801', 'portable-local-build');
   fail(issues, local?.configHash === payload.binding.configHash && local?.schemaVersion === payload.binding.schemaVersion && local?.dirty === false, 'portable-local-binding');
   fail(issues, performance?.kind === 'world-parity-portable-performance' && performance?.status === 'passed', 'portable-performance-status');
   fail(issues, performance?.tenTimesPeakSatisfied === true && performance?.deterministic === true
@@ -222,10 +222,10 @@ function verifyDraft(pack, root) {
   const signature = Buffer.from(pack.signature?.value ?? '', 'base64');
   fail(issues, pack.signature?.algorithm === 'ed25519' && signature.length > 0
     && verify(null, Buffer.from(canonicalJson(payload)), publicKey, signature), 'pack-signature');
-  fail(issues, payload.binding?.gitSha === '7aaa19d'
+  fail(issues, payload.binding?.gitSha === 'c8d6513'
     && payload.binding?.dirty === false, 'pack-binding');
   fail(issues, payload.binding?.scope?.venue === 'hyperliquid' && payload.binding?.scope?.network === 'testnet', 'pack-scope');
-  fail(issues, Array.isArray(payload.artifacts) && payload.artifacts.length === 54, 'pack-artifact-count');
+  fail(issues, Array.isArray(payload.artifacts) && payload.artifacts.length === 55, 'pack-artifact-count');
   const artifacts = loadArtifacts(payload, root, issues);
   issues.push(...suiteIssues(payload, artifacts));
   const portable = portableInputIssues(payload, artifacts);
