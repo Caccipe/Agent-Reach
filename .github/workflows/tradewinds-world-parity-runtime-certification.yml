@@ -27,7 +27,7 @@ jobs:
       ARTIFACT_ROOT: .codex-artifacts/world-parity-certification-draft-4b51437/artifacts
       PACK_PUBLIC_KEY: .codex-artifacts/governance-keys-883da75-g5/pack-public.pem
       REVIEW_VITEST: .codex-artifacts/world-parity-certification-draft-4b51437/external-red-team-agent-reach.json
-      EPHEMERAL_ROOT: '${{ runner.temp }}\tradewinds-world-parity-${{ github.run_id }}-${{ github.run_attempt }}'
+      EPHEMERAL_ROOT: '.codex-artifacts/world-parity-certification-draft-4b51437/ephemeral-agent-reach-${{ github.run_id }}-${{ github.run_attempt }}'
       COSIGN_PATH: .codex-artifacts/cosign-windows-amd64-v3.0.6.exe
       ANCHOR_BUNDLE: .codex-artifacts/world-parity-certification-draft-4b51437/external-witness-anchor.sigstore.json
       WITNESS_BUNDLE: .codex-artifacts/world-parity-certification-draft-4b51437/external-witness.sigstore.json
