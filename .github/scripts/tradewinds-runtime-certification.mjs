@@ -275,7 +275,7 @@ function review(rootArg, ephemeralArg) {
   const coverage = areaCoverage(verified.assertions);
   const report = {
     v: 1,
-    kind: 'agent-reach-github-hosted-red-team',
+    kind: 'agent-reach-external-red-team',
     issuedAt,
     packId: verified.payload.packId,
     bindingHash: bindingHash(verified.payload.binding),
@@ -319,14 +319,14 @@ function review(rootArg, ephemeralArg) {
 
   verified.payload.redTeamReview = signPayload({
     v: 1,
-    reviewId: `agent-reach-github-hosted-${issuedAt}`,
+    reviewId: `agent-reach-external-${issuedAt}`,
     packId: verified.payload.packId,
     bindingHash: bindingHash(verified.payload.binding),
     worldParityHash: worldHash(verified.payload.worldParity),
     issuedAt,
     expiresAt: verified.payload.expiresAt,
-    reviewer: 'agent-reach-github-hosted-red-team',
-    organization: 'Agent-Reach GitHub-hosted automated external review',
+    reviewer: 'agent-reach-external-red-team',
+    organization: 'Agent-Reach external Windows review environment',
     verdict: 'approve',
     areas: AREAS,
     openFindings: 0,
@@ -389,8 +389,8 @@ function finalize(rootArg, stateArg, logIndexArg, integratedSecondsArg) {
     artifactSetHash: artifactSetHash(payload.artifacts),
     issuedAt: integratedAt,
     expiresAt: payload.expiresAt,
-    witness: 'agent-reach-github-oidc-rekor-witness',
-    organization: 'Sigstore Rekor with GitHub Actions OIDC',
+    witness: 'agent-reach-rekor-witness',
+    organization: 'Sigstore Rekor public transparency log',
     logId: 'sigstore-rekor-public-good-instance-v1',
     logIndex,
     integratedAt,
