@@ -1,0 +1,72 @@
+name: TRADEWINDS WORLD_PARITY witness
+
+on:
+  push:
+    branches:
+      - tradewinds-world-parity-witness-20260805
+    paths:
+      - .github/workflows/tradewinds-world-parity-witness.yml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  witness:
+    name: Reproduce private evidence and publish Rekor witness
+    runs-on: [self-hosted, Windows, X64, tradewinds-public-witness]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: 'G:\pilotcrew\tradewinds-release-cx23-20260804'
+    env:
+      TARGET_RUNTIME_SHA: 4b514373e521abac8920626f0e7e9a2c5dc03369
+      REPORT_PATH: .github/evidence/world-parity-local-report-4b51437-g5.json
+      VITEST_PATH: .codex-artifacts/world-parity-external-vitest-agent-reach.json
+      MANIFEST_PATH: .codex-artifacts/world-parity-external-witness-agent-reach.json
+      SIGSTORE_BUNDLE_PATH: .codex-artifacts/world-parity-external-witness-agent-reach.sigstore.json
+    steps:
+      - name: Reproduce the 24 WORLD_PARITY scenario families
+        run: >-
+          pnpm exec vitest run
+          packages/engine/test/replay-matching.test.ts
+          packages/engine/test/replay-certification.test.ts
+          packages/engine/test/replay-mode-matrix.test.ts
+          packages/engine/test/portfolio-construction.test.ts
+          packages/engine/test/portfolio-mode-matrix.test.ts
+          packages/exchange/test/connector-capabilities.test.ts
+          apps/server/test/durable-oms.test.ts
+          --reporter=json
+          --outputFile="$env:VITEST_PATH"
+
+      - name: Bind source, report and reproduced assertions
+        run: >-
+          node .github/scripts/verify-world-parity-external-witness.mjs
+          "$env:REPORT_PATH" "$env:VITEST_PATH" "$env:MANIFEST_PATH"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Publish immutable Sigstore transparency witness
+        run: cosign sign-blob --yes --bundle "$env:SIGSTORE_BUNDLE_PATH" "$env:MANIFEST_PATH"
+
+      - name: Verify Sigstore identity and inclusion proof
+        run: >-
+          cosign verify-blob
+          --bundle "$env:SIGSTORE_BUNDLE_PATH"
+          --certificate-identity "https://github.com/pilotcrew-io/Agent-Reach/.github/workflows/tradewinds-world-parity-witness.yml@refs/heads/tradewinds-world-parity-witness-20260805"
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+          "$env:MANIFEST_PATH"
+
+      - name: Upload complete external witness
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tradewinds-world-parity-witness-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            G:\pilotcrew\tradewinds-release-cx23-20260804\.github\evidence\world-parity-local-report-4b51437-g5.json
+            G:\pilotcrew\tradewinds-release-cx23-20260804\.codex-artifacts\world-parity-external-vitest-agent-reach.json
+            G:\pilotcrew\tradewinds-release-cx23-20260804\.codex-artifacts\world-parity-external-witness-agent-reach.json
+            G:\pilotcrew\tradewinds-release-cx23-20260804\.codex-artifacts\world-parity-external-witness-agent-reach.sigstore.json
