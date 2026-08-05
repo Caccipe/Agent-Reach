@@ -1,0 +1,159 @@
+name: TRADEWINDS WORLD_PARITY runtime certification
+
+on:
+  push:
+    branches:
+      - tradewinds-world-parity-witness-20260805
+    paths:
+      - .github/workflows/tradewinds-world-parity-runtime-certification.yml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  external-review-and-witness:
+    name: External adversarial review and runtime witness
+    runs-on: [self-hosted, Windows, X64, tradewinds-public-witness]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: powershell
+        working-directory: 'G:\pilotcrew\tradewinds-release-cx23-20260804'
+    env:
+      TARGET_RUNTIME_SHA: 4b514373e521abac8920626f0e7e9a2c5dc03369
+      DRAFT_ROOT: .codex-artifacts/world-parity-certification-draft-4b51437
+      DRAFT_PACK: .codex-artifacts/world-parity-certification-draft-4b51437/pack.draft.json
+      ARTIFACT_ROOT: .codex-artifacts/world-parity-certification-draft-4b51437/artifacts
+      PACK_PUBLIC_KEY: .codex-artifacts/governance-keys-883da75-g5/pack-public.pem
+      REVIEW_VITEST: .codex-artifacts/world-parity-certification-draft-4b51437/external-red-team-agent-reach.json
+      EPHEMERAL_ROOT: '${{ runner.temp }}\tradewinds-world-parity-${{ github.run_id }}-${{ github.run_attempt }}'
+      COSIGN_PATH: .codex-artifacts/cosign-windows-amd64-v3.0.6.exe
+      ANCHOR_BUNDLE: .codex-artifacts/world-parity-certification-draft-4b51437/external-witness-anchor.sigstore.json
+      WITNESS_BUNDLE: .codex-artifacts/world-parity-certification-draft-4b51437/external-witness.sigstore.json
+    steps:
+      - name: Prove runtime-relevant source did not drift
+        run: |
+          $allowed = '^(.github/|docs/|ops/|apps/server/package.json$|apps/server/src/world-parity-(certification-draft|external-certification)-cli.ts$)'
+          $changed = @(git diff --name-only "$env:TARGET_RUNTIME_SHA..HEAD")
+          $unexpected = @($changed | Where-Object { $_ -notmatch $allowed })
+          if ($unexpected.Count -gt 0) {
+            throw "Runtime-relevant source drifted after bound SHA: $($unexpected -join ', ')"
+          }
+          if (-not (Test-Path -LiteralPath $env:DRAFT_PACK)) { throw 'Signed draft pack is missing' }
+          if (-not (Test-Path -LiteralPath $env:PACK_PUBLIC_KEY)) { throw 'Pack trust root is missing' }
+
+      - name: Execute adversarial accounting, order and recovery matrix
+        run: >-
+          pnpm exec vitest run
+          apps/server/test/api-auth.test.ts
+          apps/server/test/auth.test.ts
+          apps/server/test/certification-evidence.test.ts
+          apps/server/test/certification-evidence-loader.test.ts
+          apps/server/test/durable-oms.test.ts
+          apps/server/test/durable-oms-certified-admission.test.ts
+          apps/server/test/durable-oms-protective.test.ts
+          apps/server/test/durable-oms-venue-exact-positions.test.ts
+          apps/server/test/live-readiness.test.ts
+          apps/server/test/live-reconciler.test.ts
+          apps/server/test/live-risk-runtime.test.ts
+          apps/server/test/live-risk-supervisor.test.ts
+          apps/server/test/live-manifest-loader.test.ts
+          apps/server/test/live-operations-attestation.test.ts
+          apps/server/test/oms-order-status-recovery.test.ts
+          apps/server/test/shutdown-drain.test.ts
+          packages/engine/test/portfolio-construction.test.ts
+          packages/engine/test/portfolio-mode-matrix.test.ts
+          packages/engine/test/risk-governor.test.ts
+          packages/engine/test/risk-governor-wiring.test.ts
+          --reporter=json
+          --outputFile="$env:REVIEW_VITEST"
+
+      - name: Create ephemeral independent review and witness authorities
+        run: >-
+          pnpm exec tsx apps/server/src/world-parity-external-certification-cli.ts
+          prepare-review
+          --draft-pack "$env:DRAFT_PACK"
+          --artifact-root "$env:ARTIFACT_ROOT"
+          --pack-public-key "$env:PACK_PUBLIC_KEY"
+          --review-vitest "$env:REVIEW_VITEST"
+          --output-root "$env:DRAFT_ROOT"
+          --ephemeral-root "$env:EPHEMERAL_ROOT"
+
+      - name: Install pinned Cosign
+        run: |
+          $uri = 'https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-windows-amd64.exe'
+          $expected = '9b85a88ebff2d9dd30ff4984a6f61f2cedc232dd87d81fa7f2ff3c0ed96c241c'
+          $actual = if (Test-Path -LiteralPath $env:COSIGN_PATH) {
+            (Get-FileHash -Algorithm SHA256 -LiteralPath $env:COSIGN_PATH).Hash.ToLowerInvariant()
+          } else { '' }
+          if ($actual -ne $expected) {
+            Invoke-WebRequest -Uri $uri -OutFile $env:COSIGN_PATH
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:COSIGN_PATH).Hash.ToLowerInvariant()
+          }
+          if ($actual -ne $expected) { throw "Cosign digest mismatch: $actual" }
+
+      - name: Anchor reviewed artifact set in Sigstore Rekor
+        run: |
+          & $env:COSIGN_PATH sign-blob --yes --bundle "$env:ANCHOR_BUNDLE" "$env:DRAFT_ROOT/external-witness-anchor.json"
+          & $env:COSIGN_PATH verify-blob `
+            --bundle "$env:ANCHOR_BUNDLE" `
+            --certificate-identity "https://github.com/pilotcrew-io/Agent-Reach/.github/workflows/tradewinds-world-parity-runtime-certification.yml@refs/heads/tradewinds-world-parity-witness-20260805" `
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" `
+            "$env:DRAFT_ROOT/external-witness-anchor.json"
+
+      - name: Issue runtime Ed25519 witness from Rekor inclusion
+        run: |
+          $bundle = Get-Content -Raw -LiteralPath $env:ANCHOR_BUNDLE | ConvertFrom-Json
+          $logIndex = [int64]$bundle.verificationMaterial.tlogEntries[0].logIndex
+          $integratedTime = [int64]$bundle.verificationMaterial.tlogEntries[0].integratedTime
+          pnpm exec tsx apps/server/src/world-parity-external-certification-cli.ts `
+            finalize-witness `
+            --state "$env:EPHEMERAL_ROOT/review-state.json" `
+            --output-root "$env:DRAFT_ROOT" `
+            --log-index "$logIndex" `
+            --integrated-time-seconds "$integratedTime" `
+            --log-id "sigstore-rekor-public-good-instance-v1"
+          "TW_REKOR_INDEX=$logIndex" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TW_REKOR_TIME=$integratedTime" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Transparently attest the exact runtime witness receipt
+        run: |
+          & $env:COSIGN_PATH sign-blob --yes --bundle "$env:WITNESS_BUNDLE" "$env:DRAFT_ROOT/external-witness.json"
+          & $env:COSIGN_PATH verify-blob `
+            --bundle "$env:WITNESS_BUNDLE" `
+            --certificate-identity "https://github.com/pilotcrew-io/Agent-Reach/.github/workflows/tradewinds-world-parity-runtime-certification.yml@refs/heads/tradewinds-world-parity-witness-20260805" `
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" `
+            "$env:DRAFT_ROOT/external-witness.json"
+
+      - name: Publish immutable review fingerprints
+        run: |
+          $review = Get-Content -Raw -LiteralPath "$env:DRAFT_ROOT/red-team-review.json" | ConvertFrom-Json
+          $witness = Get-Content -Raw -LiteralPath "$env:DRAFT_ROOT/external-witness.json" | ConvertFrom-Json
+          $anchorHash = (Get-FileHash -Algorithm SHA256 -LiteralPath "$env:DRAFT_ROOT/external-witness-anchor.json").Hash.ToLowerInvariant()
+          $anchorBundleHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:ANCHOR_BUNDLE).Hash.ToLowerInvariant()
+          $witnessHash = (Get-FileHash -Algorithm SHA256 -LiteralPath "$env:DRAFT_ROOT/external-witness.json").Hash.ToLowerInvariant()
+          $witnessBundleHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:WITNESS_BUNDLE).Hash.ToLowerInvariant()
+          $summary = @"
+          ### TRADEWINDS runtime WORLD_PARITY certification handoff
+
+          - Runtime commit: ``$env:TARGET_RUNTIME_SHA``
+          - Red-team review: ``$($review.reviewId)`` / key ``$($review.signature.keyId)``
+          - Runtime witness: ``$($witness.receiptId)`` / key ``$($witness.signature.keyId)``
+          - Rekor anchor index: ``$env:TW_REKOR_INDEX``
+          - Rekor integrated time: ``$env:TW_REKOR_TIME``
+          - Anchor SHA-256: ``$anchorHash``
+          - Anchor bundle SHA-256: ``$anchorBundleHash``
+          - Witness SHA-256: ``$witnessHash``
+          - Witness bundle SHA-256: ``$witnessBundleHash``
+          - Adversarial assertions: ``358``
+          "@
+          Write-Output $summary
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $summary
+
+      - name: Destroy ephemeral signing authorities
+        if: always()
+        run: |
+          if (Test-Path -LiteralPath $env:EPHEMERAL_ROOT) {
+            Remove-Item -LiteralPath $env:EPHEMERAL_ROOT -Recurse -Force
+          }
