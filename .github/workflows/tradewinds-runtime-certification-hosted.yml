@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     env:
-      EVIDENCE_ROOT: .github/tradewinds-evidence/runtime-4b51437
+      EVIDENCE_ROOT: .github/tradewinds-evidence/runtime-f0342f0
       EPHEMERAL_ROOT: .github/tmp/runtime-certification-${{ github.run_id }}-${{ github.run_attempt }}
       COSIGN_PATH: .github/tmp/cosign-${{ github.run_id }}.exe
     steps:
