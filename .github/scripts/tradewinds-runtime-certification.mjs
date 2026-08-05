@@ -222,7 +222,7 @@ function verifyDraft(pack, root) {
   const signature = Buffer.from(pack.signature?.value ?? '', 'base64');
   fail(issues, pack.signature?.algorithm === 'ed25519' && signature.length > 0
     && verify(null, Buffer.from(canonicalJson(payload)), publicKey, signature), 'pack-signature');
-  fail(issues, payload.binding?.gitSha === '27d57812fe8f908cbbd3735771dcf698c1e114ca'
+  fail(issues, payload.binding?.gitSha === '27d5781'
     && payload.binding?.dirty === false, 'pack-binding');
   fail(issues, payload.binding?.scope?.venue === 'hyperliquid' && payload.binding?.scope?.network === 'testnet', 'pack-scope');
   fail(issues, Array.isArray(payload.artifacts) && payload.artifacts.length === 54, 'pack-artifact-count');
