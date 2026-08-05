@@ -26,6 +26,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Restore evidence bytes without Windows line-ending conversion
+        shell: powershell
+        run: |
+          git config core.autocrlf false
+          git -c core.autocrlf=false checkout-index --force --all
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
