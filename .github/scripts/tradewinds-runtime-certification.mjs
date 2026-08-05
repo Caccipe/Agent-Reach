@@ -190,7 +190,8 @@ function portableInputIssues(payload, artifacts) {
   const local = parseArtifact('world-parity-local-report');
   const performance = parseArtifact('world-parity-performance');
   const g5 = parseArtifact('world-parity-native-g5');
-  fail(issues, local?.kind === 'world-parity-portable-report' && local.gitSha === 'f0342f0312a46f6f40e11e3dd1ce5b75bf2188b5', 'portable-local-build');
+  fail(issues, local?.kind === 'world-parity-portable-report'
+    && local.gitSha === '27d57812fe8f908cbbd3735771dcf698c1e114ca', 'portable-local-build');
   fail(issues, local?.configHash === payload.binding.configHash && local?.schemaVersion === payload.binding.schemaVersion && local?.dirty === false, 'portable-local-binding');
   fail(issues, performance?.kind === 'world-parity-portable-performance' && performance?.status === 'passed', 'portable-performance-status');
   fail(issues, performance?.tenTimesPeakSatisfied === true && performance?.deterministic === true
@@ -221,9 +222,10 @@ function verifyDraft(pack, root) {
   const signature = Buffer.from(pack.signature?.value ?? '', 'base64');
   fail(issues, pack.signature?.algorithm === 'ed25519' && signature.length > 0
     && verify(null, Buffer.from(canonicalJson(payload)), publicKey, signature), 'pack-signature');
-  fail(issues, payload.binding?.gitSha === 'f0342f0' && payload.binding?.dirty === false, 'pack-binding');
+  fail(issues, payload.binding?.gitSha === '27d57812fe8f908cbbd3735771dcf698c1e114ca'
+    && payload.binding?.dirty === false, 'pack-binding');
   fail(issues, payload.binding?.scope?.venue === 'hyperliquid' && payload.binding?.scope?.network === 'testnet', 'pack-scope');
-  fail(issues, Array.isArray(payload.artifacts) && payload.artifacts.length === 55, 'pack-artifact-count');
+  fail(issues, Array.isArray(payload.artifacts) && payload.artifacts.length === 54, 'pack-artifact-count');
   const artifacts = loadArtifacts(payload, root, issues);
   issues.push(...suiteIssues(payload, artifacts));
   const portable = portableInputIssues(payload, artifacts);
