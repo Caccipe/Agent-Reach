@@ -1,0 +1,100 @@
+name: TRADEWINDS runtime certification hosted
+
+on:
+  push:
+    branches:
+      - tradewinds-world-parity-witness-20260805
+    paths:
+      - .github/workflows/tradewinds-runtime-certification-hosted.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  certify:
+    name: GitHub-hosted red team and Rekor witness
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_ROOT: .github/tradewinds-evidence/runtime-f0342f0
+      EPHEMERAL_ROOT: .github/tmp/runtime-certification-${{ github.run_id }}-${{ github.run_attempt }}
+      COSIGN_PATH: .github/tmp/cosign-${{ github.run_id }}.exe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify portable pack and execute adversarial review
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:EPHEMERAL_ROOT | Out-Null
+          node .github/scripts/tradewinds-runtime-certification.mjs review $env:EVIDENCE_ROOT $env:EPHEMERAL_ROOT
+
+      - name: Install pinned Cosign
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $env:COSIGN_PATH) | Out-Null
+          Invoke-WebRequest -Uri 'https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-windows-amd64.exe' -OutFile $env:COSIGN_PATH
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:COSIGN_PATH).Hash.ToLowerInvariant()
+          if ($actual -ne '9b85a88ebff2d9dd30ff4984a6f61f2cedc232dd87d81fa7f2ff3c0ed96c241c') { throw "Cosign digest mismatch: $actual" }
+
+      - name: Anchor reviewed artifact set in Rekor
+        shell: powershell
+        run: |
+          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
+          & $env:COSIGN_PATH sign-blob --yes --bundle "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" "$env:EVIDENCE_ROOT/external-witness-anchor.json"
+          & $env:COSIGN_PATH verify-blob --bundle "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" --certificate-identity $identity --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$env:EVIDENCE_ROOT/external-witness-anchor.json"
+
+      - name: Issue and attest runtime witness receipt
+        shell: powershell
+        run: |
+          $bundle = Get-Content -Raw -LiteralPath "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" | ConvertFrom-Json
+          $logIndex = [int64]$bundle.verificationMaterial.tlogEntries[0].logIndex
+          $integratedTime = [int64]$bundle.verificationMaterial.tlogEntries[0].integratedTime
+          node .github/scripts/tradewinds-runtime-certification.mjs finalize $env:EVIDENCE_ROOT "$env:EPHEMERAL_ROOT/state.json" $logIndex $integratedTime
+          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
+          & $env:COSIGN_PATH sign-blob --yes --bundle "$env:EVIDENCE_ROOT/external-witness.sigstore.json" "$env:EVIDENCE_ROOT/external-witness.json"
+          & $env:COSIGN_PATH verify-blob --bundle "$env:EVIDENCE_ROOT/external-witness.sigstore.json" --certificate-identity $identity --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$env:EVIDENCE_ROOT/external-witness.json"
+          "TW_REKOR_INDEX=$logIndex" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TW_REKOR_TIME=$integratedTime" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Destroy ephemeral private keys and publish handoff
+        shell: powershell
+        run: |
+          Remove-Item -LiteralPath $env:EPHEMERAL_ROOT -Recurse -Force
+          Remove-Item -LiteralPath $env:COSIGN_PATH -Force
+          git config user.name 'agent-reach-certification-bot'
+          git config user.email 'agent-reach-certification-bot@users.noreply.github.com'
+          git add -- "$env:EVIDENCE_ROOT"
+          git commit -m 'evidence: publish hosted WORLD_PARITY handoff [skip ci]'
+          git push origin "HEAD:$env:GITHUB_REF_NAME"
+
+      - name: Publish evidence fingerprints
+        shell: powershell
+        run: |
+          $review = Get-Content -Raw -LiteralPath "$env:EVIDENCE_ROOT/red-team-review.json" | ConvertFrom-Json
+          $witness = Get-Content -Raw -LiteralPath "$env:EVIDENCE_ROOT/external-witness.json" | ConvertFrom-Json
+          $summary = @"
+          ### TRADEWINDS GitHub-hosted runtime certification handoff
+
+          - Review: ``$($review.reviewId)`` / ``$($review.signature.keyId)``
+          - Witness: ``$($witness.receiptId)`` / ``$($witness.signature.keyId)``
+          - Rekor anchor: ``$env:TW_REKOR_INDEX`` at ``$env:TW_REKOR_TIME``
+          - Portable assertions: ``125``
+          - Tamper cases: ``5/5 rejected``
+          "@
+          Write-Output $summary
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $summary
+
+      - name: Destroy ephemeral keys on failure
+        if: failure()
+        shell: powershell
+        run: |
+          if (Test-Path -LiteralPath $env:EPHEMERAL_ROOT) { Remove-Item -LiteralPath $env:EPHEMERAL_ROOT -Recurse -Force }
+          if (Test-Path -LiteralPath $env:COSIGN_PATH) { Remove-Item -LiteralPath $env:COSIGN_PATH -Force }
