@@ -1,0 +1,8 @@
+{
+  "schema": "tw.model-identity/v1",
+  "gitSha": "9c9e3d4",
+  "sourceDigest": "sha256:d276a4730b939326db5e9020131e92796ce1bee6e6ae3f3f07d1361863ef8400",
+  "status": "no-production-onnx-loaded",
+  "executionAuthority": "none-paper-observation-only",
+  "statement": "No ML model is loaded into the order path for this paper/testnet governance observation."
+}
