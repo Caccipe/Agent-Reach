@@ -46,7 +46,8 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $env:COSIGN_PATH) | Out-Null
-          Invoke-WebRequest -Uri 'https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-windows-amd64.exe' -OutFile $env:COSIGN_PATH
+          & curl.exe --fail --location --retry 4 --retry-all-errors --output $env:COSIGN_PATH 'https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-windows-amd64.exe'
+          if ($LASTEXITCODE -ne 0) { throw "Cosign download failed with exit code $LASTEXITCODE" }
           $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:COSIGN_PATH).Hash.ToLowerInvariant()
           if ($actual -ne '9b85a88ebff2d9dd30ff4984a6f61f2cedc232dd87d81fa7f2ff3c0ed96c241c') { throw "Cosign digest mismatch: $actual" }
 
