@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        shell: pwsh
+        shell: powershell
         working-directory: 'G:\pilotcrew\tradewinds-release-cx23-20260804'
     env:
       TARGET_RUNTIME_SHA: 4b514373e521abac8920626f0e7e9a2c5dc03369
