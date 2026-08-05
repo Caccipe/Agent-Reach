@@ -47,7 +47,7 @@ jobs:
       - name: Anchor reviewed artifact set in Rekor
         shell: powershell
         run: |
-          $identity = 'https://github.com/pilotcrew-io/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
+          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
           & $env:COSIGN_PATH sign-blob --yes --bundle "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" "$env:EVIDENCE_ROOT/external-witness-anchor.json"
           & $env:COSIGN_PATH verify-blob --bundle "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" --certificate-identity $identity --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$env:EVIDENCE_ROOT/external-witness-anchor.json"
 
@@ -58,7 +58,7 @@ jobs:
           $logIndex = [int64]$bundle.verificationMaterial.tlogEntries[0].logIndex
           $integratedTime = [int64]$bundle.verificationMaterial.tlogEntries[0].integratedTime
           node .github/scripts/tradewinds-runtime-certification.mjs finalize $env:EVIDENCE_ROOT "$env:EPHEMERAL_ROOT/state.json" $logIndex $integratedTime
-          $identity = 'https://github.com/pilotcrew-io/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
+          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
           & $env:COSIGN_PATH sign-blob --yes --bundle "$env:EVIDENCE_ROOT/external-witness.sigstore.json" "$env:EVIDENCE_ROOT/external-witness.json"
           & $env:COSIGN_PATH verify-blob --bundle "$env:EVIDENCE_ROOT/external-witness.sigstore.json" --certificate-identity $identity --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$env:EVIDENCE_ROOT/external-witness.json"
           "TW_REKOR_INDEX=$logIndex" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
