@@ -3,7 +3,7 @@ name: TRADEWINDS runtime certification hosted
 on:
   push:
     branches:
-      - tradewinds-world-parity-witness-20260805
+      - tradewinds-world-parity-b29ad9c-20260806
     paths:
       - .github/workflows/tradewinds-runtime-certification-hosted.yml
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     env:
-      EVIDENCE_ROOT: .github/tradewinds-evidence/runtime-f0342f0
+      EVIDENCE_ROOT: .github/tradewinds-evidence/runtime-b29ad9c
       EPHEMERAL_ROOT: .github/tmp/runtime-certification-${{ github.run_id }}-${{ github.run_attempt }}
       COSIGN_PATH: .github/tmp/cosign-${{ github.run_id }}.exe
     steps:
@@ -47,7 +47,7 @@ jobs:
       - name: Anchor reviewed artifact set in Rekor
         shell: powershell
         run: |
-          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
+          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-b29ad9c-20260806'
           & $env:COSIGN_PATH sign-blob --yes --bundle "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" "$env:EVIDENCE_ROOT/external-witness-anchor.json"
           & $env:COSIGN_PATH verify-blob --bundle "$env:EVIDENCE_ROOT/external-witness-anchor.sigstore.json" --certificate-identity $identity --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$env:EVIDENCE_ROOT/external-witness-anchor.json"
 
@@ -58,7 +58,7 @@ jobs:
           $logIndex = [int64]$bundle.verificationMaterial.tlogEntries[0].logIndex
           $integratedTime = [int64]$bundle.verificationMaterial.tlogEntries[0].integratedTime
           node .github/scripts/tradewinds-runtime-certification.mjs finalize $env:EVIDENCE_ROOT "$env:EPHEMERAL_ROOT/state.json" $logIndex $integratedTime
-          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-witness-20260805'
+          $identity = 'https://github.com/Caccipe/Agent-Reach/.github/workflows/tradewinds-runtime-certification-hosted.yml@refs/heads/tradewinds-world-parity-b29ad9c-20260806'
           & $env:COSIGN_PATH sign-blob --yes --bundle "$env:EVIDENCE_ROOT/external-witness.sigstore.json" "$env:EVIDENCE_ROOT/external-witness.json"
           & $env:COSIGN_PATH verify-blob --bundle "$env:EVIDENCE_ROOT/external-witness.sigstore.json" --certificate-identity $identity --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$env:EVIDENCE_ROOT/external-witness.json"
           "TW_REKOR_INDEX=$logIndex" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -86,7 +86,7 @@ jobs:
           - Review: ``$($review.reviewId)`` / ``$($review.signature.keyId)``
           - Witness: ``$($witness.receiptId)`` / ``$($witness.signature.keyId)``
           - Rekor anchor: ``$env:TW_REKOR_INDEX`` at ``$env:TW_REKOR_TIME``
-          - Portable assertions: ``125``
+          - Portable assertions: ``127``
           - Tamper cases: ``5/5 rejected``
           "@
           Write-Output $summary
